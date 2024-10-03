@@ -11,12 +11,14 @@ app = FastAPI()
 class RAGInput(BaseModel):
     chunks: List[str]
     titles: List[str]
+    urls: List[str]  # New field
     generated_answer: str
 
 
 class RelevantChunk(BaseModel):
     chunk: str
     title: str
+    url: str  # New field
     relevance: float
 
 
@@ -55,21 +57,29 @@ def query_watsonx(prompt):
 
 @app.post("/find_relevant_chunks", response_model=RAGOutput)
 async def find_relevant_chunks(rag_input: RAGInput):
-    if not rag_input.chunks or not rag_input.titles or not rag_input.generated_answer:
+    if (
+        not rag_input.chunks
+        or not rag_input.titles
+        or not rag_input.urls
+        or not rag_input.generated_answer
+    ):
         raise HTTPException(
             status_code=400,
-            detail="Chunks, titles, and generated_answer must be provided",
+            detail="Chunks, titles, urls, and generated_answer must be provided",
         )
 
-    if len(rag_input.chunks) != len(rag_input.titles):
+    if len(rag_input.chunks) != len(rag_input.titles) or len(rag_input.chunks) != len(
+        rag_input.urls
+    ):
         raise HTTPException(
-            status_code=400, detail="Number of chunks and titles must be the same"
+            status_code=400,
+            detail="Number of chunks, titles, and urls must be the same",
         )
 
     relevant_chunks = []
     debug_info = []
 
-    for chunk, title in zip(rag_input.chunks, rag_input.titles):
+    for chunk, title, url in zip(rag_input.chunks, rag_input.titles, rag_input.urls):
         prompt = f"""
         Given the following chunk of text and a generated answer, determine the relevance of the chunk to the answer on a scale of 0 to 1, where 0 is not relevant at all and 1 is highly relevant.
 
@@ -102,11 +112,12 @@ async def find_relevant_chunks(rag_input: RAGInput):
                 }
             )
 
-            if relevance > 0.1:
+            if relevance > 0.5:
                 relevant_chunks.append(
                     RelevantChunk(
                         chunk=chunk,
                         title=title,
+                        url=url,  # Add URL to the RelevantChunk
                         relevance=relevance,
                     )
                 )
