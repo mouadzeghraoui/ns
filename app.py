@@ -26,6 +26,14 @@ class RAGOutput(BaseModel):
     relevant_chunks: List[RelevantChunk]
 
 
+class TextCorrectionInput(BaseModel):
+    text: str
+
+
+class TextCorrectionOutput(BaseModel):
+    corrected_text: str
+
+
 # WatsonX API details
 WATSONX_API_KEY = "E3j_MTus2GwazF6jNwDXL3tS56gb1M-BdfsUT03jbymN"
 PROJECT_ID = "806bc272-7655-482a-abba-8da43eaeee92"
@@ -35,7 +43,7 @@ os.environ["WATSONX_APIKEY"] = WATSONX_API_KEY
 
 # Create the LLM
 llm = WatsonxLLM(
-    model_id="meta-llama/llama-3-1-70b-instruct",
+    model_id="meta-llama/llama-3-1-8b-instruct",
     url="https://us-south.ml.cloud.ibm.com",
     params={
         "decoding_method": "greedy",
@@ -131,6 +139,35 @@ async def find_relevant_chunks(rag_input: RAGInput):
     print("Debug info:", json.dumps(debug_info, indent=2))
 
     return RAGOutput(relevant_chunks=relevant_chunks)
+
+
+@app.post("/correct_text", response_model=TextCorrectionOutput)
+async def correct_text(input_data: TextCorrectionInput):
+    prompt = f"""
+    Correct any mistakes and rephrase the following text. The text may be in French, English, or Dutch.
+    Maintain the original meaning and tone, but improve the grammar, spelling, and overall clarity.
+    Provide ONLY the corrected and rephrased text as a single sentence, without any additional examples, explanations, or notes.
+
+    Text to correct and rephrase:
+    {input_data.text}
+
+    Corrected text:
+    """
+
+    try:
+        corrected_text = query_watsonx(prompt)
+
+        # Process the response to extract only the corrected text
+        lines = corrected_text.split("\n")
+        corrected_text = lines[0].strip()  # Take only the first line
+
+        # Remove any remaining explanations or notes
+        if ":" in corrected_text:
+            corrected_text = corrected_text.split(":", 1)[1].strip()
+
+        return TextCorrectionOutput(corrected_text=corrected_text)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing text: {str(e)}")
 
 
 if __name__ == "__main__":
