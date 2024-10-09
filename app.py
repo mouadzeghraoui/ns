@@ -43,7 +43,7 @@ os.environ["WATSONX_APIKEY"] = WATSONX_API_KEY
 
 # Create the LLM
 llm = WatsonxLLM(
-    model_id="meta-llama/llama-3-1-70b-instruct",
+    model_id="meta-llama/llama-3-70b-instruct",
     url="https://us-south.ml.cloud.ibm.com",
     params={
         "decoding_method": "greedy",
